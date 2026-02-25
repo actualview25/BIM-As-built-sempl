@@ -1,23 +1,155 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ar">
 <head>
-<meta charset="UTF-8">
-<title>BIM Panorama Viewer</title>
+<meta charset="UTF-8" />
+<title>BIM As-Built Tour</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
 <link rel="stylesheet" href="style.css">
+
+<script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
+<script src="https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 </head>
 
 <body>
 
-<div id="sceneMenu"></div>
+<div id="ui">
+  <div id="sceneList"></div>
 
-<div id="layersPanel">
-  <label><input type="checkbox" checked data-layer="EL"> Electrical</label>
-  <label><input type="checkbox" checked data-layer="WP"> Water</label>
-  <label><input type="checkbox" checked data-layer="AC"> AC</label>
+  <div id="layers">
+    <label><input type="checkbox" data-layer="EL" checked> EL</label>
+    <label><input type="checkbox" data-layer="WP" checked> WP</label>
+    <label><input type="checkbox" data-layer="AC" checked> AC</label>
+  </div>
 </div>
 
-<script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
-<script src="app.js"></script>
+<button id="rotateBtn">⏸️ إيقاف الدوران</button>
+
+<div id="container"></div>
+
+<script>
+let scene3D, camera, renderer, controls, sphere;
+let allLayers = { EL: [], WP: [], AC: [] };
+let scenesData = [];
+let autoRotate = true;
+
+init();
+
+function init() {
+  fetch("tour-data.json")
+    .then(r => r.json())
+    .then(data => {
+      scenesData = data.scenes;
+      setupScene();
+      buildSceneList();
+      loadScene(0);
+      animate();
+    })
+    .catch(err => console.error("JSON ERROR:", err));
+}
+
+function setupScene() {
+  scene3D = new THREE.Scene();
+
+  camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 2000);
+  camera.position.set(0,0,0.1);
+
+  renderer = new THREE.WebGLRenderer({ antialias:true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  document.getElementById("container").appendChild(renderer.domElement);
+
+  controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableZoom = true;
+  controls.enablePan = false;
+  controls.autoRotate = true;
+  controls.autoRotateSpeed = 0.5;
+
+  window.addEventListener("resize", onResize);
+
+  document.getElementById("rotateBtn").onclick = () => {
+    autoRotate = !autoRotate;
+    controls.autoRotate = autoRotate;
+    document.getElementById("rotateBtn").innerText =
+      autoRotate ? "⏸️ إيقاف الدوران" : "▶️ تشغيل الدوران";
+  };
+
+  document.querySelectorAll("#layers input").forEach(cb=>{
+    cb.addEventListener("change",()=>{
+      allLayers[cb.dataset.layer].forEach(m=>m.visible = cb.checked);
+    });
+  });
+}
+
+function buildSceneList(){
+  const list = document.getElementById("sceneList");
+  list.innerHTML = "";
+  scenesData.forEach((s,i)=>{
+    const btn = document.createElement("button");
+    btn.textContent = s.name;
+    btn.onclick = ()=> loadScene(i);
+    list.appendChild(btn);
+  });
+}
+
+function loadScene(index){
+  const data = scenesData[index];
+
+  if(sphere) scene3D.remove(sphere);
+  Object.values(allLayers).flat().forEach(m=>scene3D.remove(m));
+  allLayers = { EL:[], WP:[], AC:[] };
+
+  new THREE.TextureLoader().load(data.image, tex=>{
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.repeat.x = -1;
+
+    sphere = new THREE.Mesh(
+      new THREE.SphereGeometry(500,128,128),
+      new THREE.MeshBasicMaterial({ map: tex, side: THREE.BackSide })
+    );
+    scene3D.add(sphere);
+  });
+
+  data.paths.forEach(p=>{
+    const color =
+      p.type==="EL" ? 0xff4444 :
+      p.type==="WP" ? 0x44aaff :
+      0x44ff88;
+
+    for(let i=0;i<p.points.length-1;i++){
+      const a = new THREE.Vector3(...p.points[i]);
+      const b = new THREE.Vector3(...p.points[i+1]);
+      const dir = new THREE.Vector3().subVectors(b,a);
+      const len = dir.length();
+
+      const mesh = new THREE.Mesh(
+        new THREE.CylinderGeometry(2,2,len,8),
+        new THREE.MeshStandardMaterial({ color })
+      );
+
+      mesh.quaternion.setFromUnitVectors(
+        new THREE.Vector3(0,1,0),
+        dir.clone().normalize()
+      );
+      mesh.position.copy(a.clone().add(b).multiplyScalar(0.5));
+
+      scene3D.add(mesh);
+      allLayers[p.type].push(mesh);
+    }
+  });
+}
+
+function animate(){
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene3D,camera);
+}
+
+function onResize(){
+  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+</script>
 
 </body>
 </html>
