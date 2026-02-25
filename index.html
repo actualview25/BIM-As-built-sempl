@@ -1,195 +1,23 @@
 <!DOCTYPE html>
-<html lang="ar">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>BIM Virtual Tour</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-
+<title>BIM Panorama Viewer</title>
 <link rel="stylesheet" href="style.css">
-
-<script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
-<script src="https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-<script src="https://unpkg.com/three@0.128.0/examples/js/renderers/CSS2DRenderer.js"></script>
 </head>
 
 <body>
 
-<div class="info">🏗️ BIM Virtual Tour</div>
-<div id="container"></div>
+<div id="sceneMenu"></div>
 
-<button id="autoRotateBtn">⏸️ إيقاف الدوران</button>
-
-<!-- لوحة الطبقات -->
 <div id="layersPanel">
-    <label><input type="checkbox" checked data-layer="BASE"> BASE</label>
-    <hr>
-    <label><input type="checkbox" checked data-layer="EL"> EL – كهرباء</label>
-    <label><input type="checkbox" checked data-layer="WP"> WP – مياه</label>
-    <label><input type="checkbox" checked data-layer="AC"> AC – تكييف</label>
+  <label><input type="checkbox" checked data-layer="EL"> Electrical</label>
+  <label><input type="checkbox" checked data-layer="WP"> Water</label>
+  <label><input type="checkbox" checked data-layer="AC"> AC</label>
 </div>
 
-<script>
-let autoRotate = true;
-let scenes = [];
-let scene3D, camera, renderer, labelRenderer, controls, sphereMesh;
-let currentSceneIndex = 0;
-
-/* ===== Groups ===== */
-const pathGroups = {
-    EL: new THREE.Group(),
-    WP: new THREE.Group(),
-    AC: new THREE.Group(),
-    GS: new THREE.Group()
-};
-
-const hotspotGroup = new THREE.Group();
-
-fetch('tour-data.json')
-.then(r => r.json())
-.then(data => {
-
-    scenes = data;
-
-    scene3D = new THREE.Scene();
-    scene3D.background = new THREE.Color(0x000000);
-
-    camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 2000);
-    camera.position.set(0,0,0.1);
-
-    renderer = new THREE.WebGLRenderer({ antialias:true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    document.getElementById('container').appendChild(renderer.domElement);
-
-    labelRenderer = new THREE.CSS2DRenderer();
-    labelRenderer.setSize(window.innerWidth, window.innerHeight);
-    labelRenderer.domElement.style.position = 'absolute';
-    labelRenderer.domElement.style.top = '0';
-    labelRenderer.domElement.style.pointerEvents = 'none';
-    document.body.appendChild(labelRenderer.domElement);
-
-    const ambient = new THREE.AmbientLight(0xffffff, 1.4);
-    scene3D.add(ambient);
-
-    Object.values(pathGroups).forEach(g => scene3D.add(g));
-    scene3D.add(hotspotGroup);
-
-    controls = new THREE.OrbitControls(camera, renderer.domElement);
-    controls.enablePan = false;
-    controls.enableDamping = true;
-    controls.autoRotate = autoRotate;
-    controls.autoRotateSpeed = 0.5;
-
-    autoRotateBtn.onclick = () => {
-        autoRotate = !autoRotate;
-        controls.autoRotate = autoRotate;
-        autoRotateBtn.textContent = autoRotate ? '⏸️ إيقاف الدوران' : '▶️ تشغيل الدوران';
-    };
-
-    function clearGroups(){
-        Object.values(pathGroups).forEach(g=>{
-            while(g.children.length) g.remove(g.children[0]);
-        });
-        while(hotspotGroup.children.length) hotspotGroup.remove(hotspotGroup.children[0]);
-    }
-
-    function loadScene(index){
-        const data = scenes[index];
-        if(!data) return;
-        currentSceneIndex = index;
-
-        if(sphereMesh) scene3D.remove(sphereMesh);
-        clearGroups();
-
-        new THREE.TextureLoader().load(data.image, texture => {
-            texture.wrapS = THREE.RepeatWrapping;
-            texture.repeat.x = -1;
-
-            sphereMesh = new THREE.Mesh(
-                new THREE.SphereGeometry(500,128,128),
-                new THREE.MeshBasicMaterial({ map:texture, side:THREE.BackSide })
-            );
-            scene3D.add(sphereMesh);
-
-            /* PATHS */
-            if(data.paths){
-                data.paths.forEach(p=>{
-                    const group = pathGroups[p.type];
-                    if(!group) return;
-
-                    const pts = p.points.map(v=>new THREE.Vector3(v.x,v.y,v.z));
-                    for(let i=0;i<pts.length-1;i++){
-                        const a = pts[i], b = pts[i+1];
-                        const dir = new THREE.Vector3().subVectors(b,a);
-                        const len = dir.length();
-                        if(len < 5) continue;
-
-                        const mesh = new THREE.Mesh(
-                            new THREE.CylinderGeometry(3.5,3.5,len,12),
-                            new THREE.MeshStandardMaterial({
-                                color:p.color,
-                                emissive:p.color,
-                                emissiveIntensity:0.25
-                            })
-                        );
-
-                        mesh.quaternion.setFromUnitVectors(
-                            new THREE.Vector3(0,1,0),
-                            dir.clone().normalize()
-                        );
-                        mesh.position.copy(a.clone().add(b).multiplyScalar(0.5));
-                        group.add(mesh);
-                    }
-                });
-            }
-
-            /* HOTSPOTS */
-            if(data.hotspots){
-                data.hotspots.forEach(h=>{
-                    const div = document.createElement('div');
-                    div.className = 'hotspot';
-                    div.innerHTML = `<strong>${h.data.title}</strong><br>${h.data.content}`;
-
-                    const label = new THREE.CSS2DObject(div);
-                    label.position.set(h.position.x, h.position.y, h.position.z);
-                    hotspotGroup.add(label);
-                });
-            }
-        });
-    }
-
-    loadScene(0);
-
-    window.addEventListener('resize',()=>{
-        camera.aspect = window.innerWidth/window.innerHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(window.innerWidth,window.innerHeight);
-        labelRenderer.setSize(window.innerWidth,window.innerHeight);
-    });
-
-    function animate(){
-        requestAnimationFrame(animate);
-        controls.update();
-        renderer.render(scene3D,camera);
-        labelRenderer.render(scene3D,camera);
-    }
-    animate();
-});
-
-/* Layer controls */
-document.querySelectorAll('#layersPanel input').forEach(cb=>{
-    cb.addEventListener('change',e=>{
-        const layer = e.target.dataset.layer;
-        if(layer === 'BASE'){
-            const v = e.target.checked;
-            Object.values(pathGroups).forEach(g=>g.visible = v);
-            document.querySelectorAll('#layersPanel input[data-layer]:not([data-layer="BASE"])')
-                .forEach(x=>x.checked = v);
-        } else {
-            pathGroups[layer].visible = e.target.checked;
-        }
-    });
-});
-</script>
+<script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+<script src="app.js"></script>
 
 </body>
 </html>
