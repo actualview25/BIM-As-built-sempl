@@ -63,7 +63,8 @@
                     new THREE.TextureLoader().load(sceneData.image, texture => {
                         texture.wrapS = THREE.RepeatWrapping;
                         texture.wrapT = THREE.RepeatWrapping;
-                        texture.repeat.x = -1;
+                       texture.center.set(0.5, 0.5);
+                              texture.repeat.x = -1;
 
                         const geometry = new THREE.SphereGeometry(500,128,128);
                         const material = new THREE.MeshBasicMaterial({map:texture, side:THREE.BackSide});
