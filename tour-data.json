@@ -4,73 +4,38 @@
       "id": "scene_0",
       "name": "Entrance",
       "image": "panos/scene0.jpg",
-      "paths": [],
       "hotspots": [
-        {
-          "type": "NAV",
-          "position": [5, 0, 0],
-          "targetId": "scene_1"
-        }
+        { "position": [5, 0, 0], "targetId": "scene_1" }
       ]
     },
-
     {
       "id": "scene_1",
       "name": "Main Floor",
       "image": "panos/scene1.jpg",
-      "paths": [
-        { "type":"EL", "color": 16763904, "points":[[0,0,0],[3,0,0],[6,0,2]] },
-        { "type":"WP", "color": 26367, "points":[[0,0,0],[0,0,4],[2,0,6]] },
-        { "type":"AC", "color": 52479, "points":[[-2,0,0],[-2,0,3],[-1,0,6]] }
-      ],
       "hotspots": [
-        {
-          "type": "NAV",
-          "position": [6, 0, 2],
-          "targetId": "scene_2"
-        }
+        { "position": [6, 0, 2], "targetId": "scene_2" }
       ]
     },
-
     {
       "id": "scene_2",
-      "name": "Electrical BIM",
+      "name": "Electrical",
       "image": "panos/scene2.jpg",
-      "paths": [
-        { "type":"EL", "color": 16763904, "points":[[0,0,0],[3,0,1],[6,0,3]] }
-      ],
       "hotspots": [
-        {
-          "type": "NAV",
-          "position": [6, 0, 3],
-          "targetId": "scene_3"
-        }
+        { "position": [6, 0, 3], "targetId": "scene_3" }
       ]
     },
-
     {
       "id": "scene_3",
-      "name": "Water Paths",
+      "name": "Water",
       "image": "panos/scene3.jpg",
-      "paths": [
-        { "type":"WP", "color": 26367, "points":[[0,0,0],[0,0,5]] }
-      ],
       "hotspots": [
-        {
-          "type": "NAV",
-          "position": [0, 0, 5],
-          "targetId": "scene_4"
-        }
+        { "position": [0, 0, 5], "targetId": "scene_4" }
       ]
     },
-
     {
       "id": "scene_4",
-      "name": "AC System",
+      "name": "AC",
       "image": "panos/scene4.jpg",
-      "paths": [
-        { "type":"AC", "color": 52479, "points":[[-2,0,0],[-2,0,6]] }
-      ],
       "hotspots": []
     }
   ]
