@@ -1,9 +1,24 @@
-{
-  "scenes": [
-    {"id":"scene_0","name":"Entrance","image":"panos/scene0.jpg","paths":[],"hotspots":[{"type":"NAV","position":[5,0,0],"targetId":"scene_1"}]},
-    {"id":"scene_1","name":"Main Floor","image":"panos/scene1.jpg","paths":[{"type":"EL","color":16763904,"points":[[0,0,0],[3,0,0],[6,0,2]]},{"type":"WP","color":26367,"points":[[0,0,0],[0,0,4],[2,0,6]]},{"type":"AC","color":52479,"points":[[-2,0,0],[-2,0,3],[-1,0,6]]}],"hotspots":[{"type":"NAV","position":[6,0,2],"targetId":"scene_2"}]},
-    {"id":"scene_2","name":"Electrical BIM","image":"panos/scene2.jpg","paths":[{"type":"EL","color":16763904,"points":[[0,0,0],[3,0,1],[6,0,3]]}],"hotspots":[{"type":"NAV","position":[6,0,3],"targetId":"scene_3"}]},
-    {"id":"scene_3","name":"Water Paths","image":"panos/scene3.jpg","paths":[{"type":"WP","color":26367,"points":[[0,0,0],[0,0,5]]}],"hotspots":[{"type":"NAV","position":[0,0,5],"targetId":"scene_4"}]},
-    {"id":"scene_4","name":"AC System","image":"panos/scene4.jpg","paths":[{"type":"AC","color":52479,"points":[[-2,0,0],[-2,0,6]]}],"hotspots":[]}
-  ]
-}
+[
+  {
+    "name": "Entrance",
+    "image": "panos/scene0.jpg",
+    "hotspots": [
+      { "x": 3000, "y": 0, "z": 0, "target": 1 }
+    ]
+  },
+  {
+    "name": "Main Floor",
+    "image": "panos/scene1.jpg",
+    "hotspots": [
+      { "x": -3000, "y": 0, "z": 0, "target": 0 },
+      { "x": 0, "y": 0, "z": 3000, "target": 2 }
+    ]
+  },
+  {
+    "name": "Electrical BIM",
+    "image": "panos/scene2.jpg",
+    "hotspots": []
+  },
+  { "name": "Scene 3", "image": "panos/scene3.jpg" },
+  { "name": "Scene 4", "image": "panos/scene4.jpg" }
+]
