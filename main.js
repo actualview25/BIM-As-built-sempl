@@ -14,6 +14,7 @@ function init() {
         .then(res => res.json())
         .then(data => {
             scenes = data.scenes;
+            console.log('✅ تم تحميل JSON:', scenes);
             setupScene();
             loadScene(currentScene);
         })
@@ -48,6 +49,10 @@ function setupScene() {
         camera.aspect = window.innerWidth/window.innerHeight;
         camera.updateProjectionMatrix();
         renderer.setSize(window.innerWidth, window.innerHeight);
+        // إعادة رسم النقاط الساخنة بعد تغيير الحجم
+        if (scenes[currentScene]) {
+            setTimeout(() => drawHotspots(scenes[currentScene].hotspots), 200);
+        }
     });
 
     animate();
@@ -57,11 +62,14 @@ function loadScene(index) {
     const data = scenes[index];
     if(!data) return;
     currentScene = index;
+    console.log('🔄 تحميل المشهد:', data.name, 'الصورة:', data.image);
 
     if(sphereMesh) scene3D.remove(sphereMesh);
     document.querySelectorAll('.hotspot').forEach(e => e.remove());
 
     new THREE.TextureLoader().load(data.image, texture => {
+        console.log('✅ تم تحميل الصورة:', data.image);
+        
         texture.wrapS = THREE.RepeatWrapping;
         texture.wrapT = THREE.RepeatWrapping;
         texture.repeat.x = -1;
@@ -72,7 +80,11 @@ function loadScene(index) {
         scene3D.add(sphereMesh);
 
         if(data.paths) drawPaths(data.paths);
-        if(data.hotspots) drawHotspots(data.hotspots);
+        
+        // تأخير بسيط لرسم النقاط الساخنة بعد تحميل الصورة
+        setTimeout(() => {
+            if(data.hotspots) drawHotspots(data.hotspots);
+        }, 500);
 
     }, undefined, err => {
         console.error('❌ فشل تحميل الصورة:', data.image, err);
@@ -83,34 +95,86 @@ function loadScene(index) {
 function drawPaths(paths) {
     paths.forEach(path => {
         const color = normalizeColor(path.color);
-        const points = path.points.map(p => new THREE.Vector3(...p));
+        const points = path.points.map(p => new THREE.Vector3(p[0], p[1], p[2]));
         for(let i=0;i<points.length-1;i++){
             const start=points[i], end=points[i+1];
             const dir = new THREE.Vector3().subVectors(end,start);
             const dist = dir.length();
             if(dist<0.5) continue;
+            
             const cyl = new THREE.Mesh(
                 new THREE.CylinderGeometry(2,2,dist,12),
-                new THREE.MeshStandardMaterial({color, emissive:color, emissiveIntensity:0.3})
+                new THREE.MeshStandardMaterial({
+                    color: color,
+                    emissive: color,
+                    emissiveIntensity: 0.3
+                })
             );
-            cyl.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0), dir.clone().normalize()));
+            
+            // توجيه الاسطوانة
+            const quaternion = new THREE.Quaternion().setFromUnitVectors(
+                new THREE.Vector3(0,1,0), 
+                dir.clone().normalize()
+            );
+            cyl.applyQuaternion(quaternion);
+            
+            // وضع الاسطوانة في المنتصف بين النقطتين
             cyl.position.copy(new THREE.Vector3().addVectors(start,end).multiplyScalar(0.5));
+            
             scene3D.add(cyl);
         }
     });
 }
 
 function drawHotspots(hotspots) {
+    // إزالة النقاط الساخنة القديمة
+    document.querySelectorAll('.hotspot').forEach(e => e.remove());
+    
     hotspots.forEach(h => {
+        // تحويل النقطة من إحداثيات المسرح إلى إحداثيات الشاشة
+        const vector = new THREE.Vector3(h.position[0], h.position[1], h.position[2]);
+        
+        // تحديث مصفوفة الكاميرا
+        camera.updateMatrixWorld();
+        
+        // إسقاط النقطة على الشاشة
+        vector.project(camera);
+        
+        // تحويل إلى إحداثيات بكسل
+        const x = (vector.x * 0.5 + 0.5) * window.innerWidth;
+        const y = (-vector.y * 0.5 + 0.5) * window.innerHeight;
+        
+        // تجاهل النقاط خلف الكاميرا أو خارج الشاشة
+        if (vector.z > 1 || x < 0 || x > window.innerWidth || y < 0 || y > window.innerHeight) {
+            console.log('نقطة خارج الشاشة:', h.position);
+            return;
+        }
+
+        // إنشاء عنصر HTML للنقطة الساخنة
         const div = document.createElement('div');
-        div.className='hotspot';
-        div.style.color='#44aaff';
-        div.innerHTML = `<span class='hotspot-icon'>🚪</span>`;
-        div.onclick = e => {
+        div.className = 'hotspot';
+        div.style.left = x + 'px';
+        div.style.top = y + 'px';
+        div.style.color = '#44aaff';
+        
+        // إضافة أيقونة وتلميح
+        div.innerHTML = `
+            <span class='hotspot-icon'>🚪</span>
+            <div class='hotspot-tooltip'>
+                <strong>انتقال إلى: ${h.targetId}</strong>
+            </div>
+        `;
+        
+        // حدث النقر للانتقال إلى المشهد التالي
+        div.onclick = (e) => {
             e.stopPropagation();
             const targetIndex = scenes.findIndex(s => s.id === h.targetId);
-            if(targetIndex!==-1) loadScene(targetIndex);
+            if(targetIndex !== -1) {
+                console.log('الانتقال إلى:', h.targetId);
+                loadScene(targetIndex);
+            }
         };
+        
         document.body.appendChild(div);
     });
 }
@@ -118,7 +182,14 @@ function drawHotspots(hotspots) {
 function animate() {
     requestAnimationFrame(animate);
     controls.update();
-    renderer.render(scene3D,camera);
+    renderer.render(scene3D, camera);
+    
+    // تحديث مواقع النقاط الساخنة أثناء الدوران (اختياري)
+    if (scenes[currentScene] && scenes[currentScene].hotspots) {
+        // يمكن إضافة تحديث مستمر للمواقع إذا أردت
+        // لكن هذا قد يؤثر على الأداء
+    }
 }
 
+// بدء التطبيق
 init();
