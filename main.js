@@ -5,12 +5,11 @@ let autoRotate = true;
 let pathObjects = [];
 let hotspotElements = [];
 
-// ثابت لتحجيم المسارات (حجم الكرة 500 / حجم النموذج)
-const SCALE_FACTOR = 50; // جرب 50, 80, 100 حسب ما يناسب
+// ثابت لتحجيم المسارات
+const SCALE_FACTOR = 30; // جرب 30, 40, 50 حسب الحاجة
 
 function normalizeColor(color) {
     if (typeof color === 'number') return color;
-    if (typeof color === 'string' && color.startsWith('#')) return parseInt(color.substring(1), 16);
     return 0xffffff;
 }
 
@@ -20,19 +19,19 @@ function init() {
         .then(res => res.json())
         .then(data => {
             scenes = data.scenes;
-            console.log('✅ JSON:', scenes);
+            console.log('✅ تم تحميل JSON بنجاح');
             setupScene();
             loadScene(0);
         })
-        .catch(err => console.error('❌ خطأ:', err));
+        .catch(err => {
+            console.error('❌ خطأ في JSON:', err);
+            alert('خطأ في ملف JSON - تأكد من تنسيقه');
+        });
 }
 
 function setupScene() {
     scene3D = new THREE.Scene();
     scene3D.background = new THREE.Color(0x000000);
-
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
-    scene3D.add(ambientLight);
 
     camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
     camera.position.set(0, 0, 0.1);
@@ -66,6 +65,8 @@ function setupScene() {
 function loadScene(index) {
     const data = scenes[index];
     if (!data) return;
+    
+    console.log('تحميل المشهد:', data.name);
     currentScene = index;
 
     // تنظيف
@@ -86,11 +87,17 @@ function loadScene(index) {
         sphereMesh = new THREE.Mesh(geometry, material);
         scene3D.add(sphereMesh);
 
-        // رسم المسارات - مع التحجيم
-        if (data.paths) drawPaths(data.paths);
+        // رسم المسارات
+        if (data.paths && data.paths.length > 0) {
+            drawPaths(data.paths);
+        }
         
         // رسم النقاط الساخنة
-        if (data.hotspots) drawHotspots(data.hotspots);
+        if (data.hotspots && data.hotspots.length > 0) {
+            drawHotspots(data.hotspots);
+        }
+    }, undefined, (err) => {
+        console.error('فشل تحميل الصورة:', data.image);
     });
 }
 
@@ -98,7 +105,7 @@ function drawPaths(paths) {
     paths.forEach(path => {
         const color = normalizeColor(path.color);
         
-        // تحويل النقاط مع تطبيق التحجيم
+        // تحويل النقاط مع التحجيم
         const points = path.points.map(p => new THREE.Vector3(
             p[0] * SCALE_FACTOR,
             p[1] * SCALE_FACTOR,
@@ -116,7 +123,7 @@ function drawPaths(paths) {
 
             // خط المسار
             const cylinder = new THREE.Mesh(
-                new THREE.CylinderGeometry(3, 3, dist, 8),
+                new THREE.CylinderGeometry(2, 2, dist, 6),
                 new THREE.MeshStandardMaterial({ 
                     color: color,
                     emissive: color,
@@ -135,20 +142,6 @@ function drawPaths(paths) {
 
             scene3D.add(cylinder);
             pathObjects.push(cylinder);
-
-            // نقاط البداية والنهاية
-            [start, end].forEach(pos => {
-                const sphere = new THREE.Mesh(
-                    new THREE.SphereGeometry(4, 8, 8),
-                    new THREE.MeshStandardMaterial({ 
-                        color: color,
-                        emissive: color 
-                    })
-                );
-                sphere.position.copy(pos);
-                scene3D.add(sphere);
-                pathObjects.push(sphere);
-            });
         }
     });
 }
@@ -157,10 +150,14 @@ function drawHotspots(hotspots) {
     hotspots.forEach(h => {
         const div = document.createElement('div');
         div.className = 'hotspot';
-        div.innerHTML = `<span class='hotspot-icon'>🚪</span>`;
+        div.innerHTML = '<span class="hotspot-icon">🚪</span>';
         div.title = `انتقال إلى ${h.targetId}`;
         document.body.appendChild(div);
-        hotspotElements.push({ element: div, position: h.position });
+        
+        hotspotElements.push({
+            element: div,
+            position: h.position
+        });
 
         div.onclick = () => {
             const target = scenes.findIndex(s => s.id === h.targetId);
