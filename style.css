@@ -1,38 +1,43 @@
 body {
-  margin: 0;
-  overflow: hidden;
-  font-family: sans-serif;
+  margin:0;
+  overflow:hidden;
+  font-family: Arial, sans-serif;
 }
 
-#sceneMenu {
-  position: fixed;
-  left: 20px;
-  top: 20px;
-  background: rgba(0,0,0,0.7);
-  padding: 10px;
-  border-radius: 10px;
-  z-index: 10;
+#container {
+  width:100vw;
+  height:100vh;
+  background:#000;
 }
 
-#sceneMenu button {
-  display: block;
-  margin-bottom: 5px;
-  width: 160px;
-  cursor: pointer;
+#ui {
+  position:fixed;
+  top:20px;
+  left:20px;
+  z-index:10;
 }
 
-#layersPanel {
-  position: fixed;
-  right: 20px;
-  top: 20px;
-  background: rgba(0,0,0,0.7);
-  padding: 10px;
-  border-radius: 10px;
-  color: white;
-  z-index: 10;
+#sceneList button {
+  display:block;
+  margin-bottom:6px;
+  padding:6px 12px;
+  cursor:pointer;
 }
 
-#layersPanel label {
-  display: block;
-  cursor: pointer;
+#layers {
+  margin-top:10px;
+  background:rgba(0,0,0,0.6);
+  padding:10px;
+  color:#fff;
+  border-radius:8px;
+}
+
+#rotateBtn {
+  position:fixed;
+  bottom:20px;
+  left:50%;
+  transform:translateX(-50%);
+  padding:10px 20px;
+  z-index:10;
+  cursor:pointer;
 }
