@@ -1,9 +1,15 @@
 body { 
     margin: 0; 
     overflow: hidden; 
-    font-family: Arial, sans-serif;
+    font-family: Arial, sans-serif; 
 }
-#container { width: 100vw; height: 100vh; background: #000; }
+
+#container { 
+    width: 100vw; 
+    height: 100vh; 
+    background: #000; 
+}
+
 .hotspot {
     position: absolute;
     transform: translate(-50%, -50%);
@@ -12,7 +18,11 @@ body {
     filter: drop-shadow(0 0 10px currentColor);
     transition: transform 0.3s ease;
 }
-.hotspot:hover { transform: translate(-50%, -50%) scale(1.2); }
+
+.hotspot:hover { 
+    transform: translate(-50%, -50%) scale(1.2); 
+}
+
 .hotspot-tooltip {
     position: absolute;
     background: rgba(0, 0, 0, 0.9);
@@ -30,8 +40,10 @@ body {
     direction: rtl;
     white-space: nowrap;
 }
+
 .hotspot:hover .hotspot-tooltip { display: block; }
 .hotspot-icon { font-size: 30px; display: block; text-align: center; }
+
 #autoRotateBtn {
     position: fixed;
     bottom: 20px;
@@ -49,4 +61,8 @@ body {
     direction: rtl;
     transition: all 0.3s ease;
 }
-#autoRotateBtn:hover { background: rgba(0,0,0,0.9); border-color:#6a8caf; }
+
+#autoRotateBtn:hover { 
+    background: rgba(0,0,0,0.9); 
+    border-color:#6a8caf; 
+}
