@@ -1,21 +1,24 @@
 <!DOCTYPE html>
 <html lang="ar">
 <head>
-  <meta charset="utf-8" />
-  <title>Virtual Tour</title>
-  <base href="/BIM-As-built-sempl/">
-  <style>
-    html,body { margin:0; height:100%; overflow:hidden; background:#000; }
-    canvas { display:block; }
-    .hotspot {
-      position:absolute; width:18px; height:18px;
-      background:#00e5ff; border-radius:50%;
-      transform:translate(-50%,-50%);
-      cursor:pointer;
-    }
-  </style>
+<meta charset="utf-8">
+<title>Virtual Tour</title>
+<base href="/BIM-As-built-sempl/">
+<style>
+html,body { margin:0; height:100%; overflow:hidden; background:black; }
+.hotspot{
+  position:absolute;
+  width:18px;height:18px;
+  background:#00ffff;
+  border-radius:50%;
+  transform:translate(-50%,-50%);
+  cursor:pointer;
+}
+</style>
 </head>
 <body>
-  <script type="module" src="main.js"></script>
+
+<script type="module" src="main.js"></script>
+
 </body>
 </html>
