@@ -87,10 +87,7 @@ function loadScene(index) {
 
     // تحميل الصورة
     const loader = new THREE.TextureLoader();
-    
-    // نجرب المسارين المحتملين
     const imagePath = data.image;
-    const altImagePath = imagePath.replace('scene', 'scene-');
     
     console.log('محاولة تحميل الصورة:', imagePath);
     
@@ -102,19 +99,8 @@ function loadScene(index) {
         },
         undefined,
         (err) => {
-            console.log('❌ فشل المسار الأول، جرب المسار البديل:', altImagePath);
-            loader.load(
-                altImagePath,
-                (texture) => {
-                    console.log('✅ تم تحميل الصورة:', altImagePath);
-                    createSphereWithTexture(texture, data);
-                },
-                undefined,
-                (err) => {
-                    console.error('❌ فشل تحميل الصورة من كل المسارات:', data.image);
-                    alert(`خطأ في تحميل الصورة: ${data.image}\nتأكد من وجود الملف في مجلد panos/`);
-                }
-            );
+            console.error('❌ فشل تحميل الصورة:', imagePath, err);
+            alert(`خطأ في تحميل الصورة: ${imagePath}\nتأكد من وجود الملف في مجلد panos/`);
         }
     );
 }
@@ -122,10 +108,10 @@ function loadScene(index) {
 function createSphereWithTexture(texture, data) {
     // تعديل إعدادات النسيج
     texture.wrapS = THREE.RepeatWrapping;
-    texture.wrapT = THREE.ClampToEdgeWrapping;  // تغيير هذا
-    texture.repeat.set(1, 1);  // عدم التكرار
+    texture.wrapT = THREE.ClampToEdgeWrapping;
+    texture.repeat.set(1, 1);
     
-    // الكرة بحجم 100 (أصغر) والكاميرا في المركز
+    // الكرة بحجم 100
     const geometry = new THREE.SphereGeometry(100, 64, 64);
     const material = new THREE.MeshBasicMaterial({ 
         map: texture, 
@@ -135,7 +121,7 @@ function createSphereWithTexture(texture, data) {
     sphereMesh = new THREE.Mesh(geometry, material);
     scene3D.add(sphereMesh);
 
-    // رسم المسارات
+    // رسم المسارات - مع تعديل الإحداثيات
     if (data.paths && data.paths.length > 0) {
         console.log('رسم المسارات:', data.paths.length);
         drawPaths(data.paths);
@@ -151,23 +137,37 @@ function createSphereWithTexture(texture, data) {
 function drawPaths(paths) {
     paths.forEach(path => {
         const color = normalizeColor(path.color);
-        const points = path.points.map(p => new THREE.Vector3(p[0], p[1], p[2]));
+        
+        // تعديل IMPORTANT: تقليل حجم المسارات وجعلها قريبة من الكرة
+        const points = path.points.map(p => {
+            // تصغير الإحداثيات وجعلها على سطح الكرة
+            return new THREE.Vector3(
+                p[0] * 2,  // تصغير المسافة
+                p[1] * 2,
+                p[2] * 2
+            );
+        });
 
         for (let i = 0; i < points.length - 1; i++) {
             const start = points[i];
             const end = points[i + 1];
+            
+            // التأكد من أن النقاط على سطح الكرة
+            start.normalize().multiplyScalar(98); // أقل بقليل من نصف القطر
+            end.normalize().multiplyScalar(98);
+            
             const dir = new THREE.Vector3().subVectors(end, start);
             const distance = dir.length();
             
             if (distance < 0.1) continue;
 
-            // إنشاء اسطوانة للخط
+            // إنشاء اسطوانة صغيرة للخط
             const cylinder = new THREE.Mesh(
-                new THREE.CylinderGeometry(1.5, 1.5, distance, 8),
+                new THREE.CylinderGeometry(0.5, 0.5, distance, 6),
                 new THREE.MeshStandardMaterial({ 
                     color: color, 
                     emissive: color, 
-                    emissiveIntensity: 0.3 
+                    emissiveIntensity: 0.5 
                 })
             );
 
@@ -208,7 +208,6 @@ function drawHotspots(hotspotsData) {
         };
     });
 
-    // تحديث المواقع بعد إضافة النقاط
     setTimeout(updateHotspotPositions, 100);
 }
 
@@ -219,23 +218,26 @@ function updateHotspotPositions() {
         const div = hotspotElements[i];
         if (!div) return;
 
-        const vector = new THREE.Vector3(h.position[0], h.position[1], h.position[2]);
+        // تعديل IMPORTANT: نفس تعديل المسارات للنقاط الساخنة
+        const vector = new THREE.Vector3(
+            h.position[0] * 2,
+            h.position[1] * 2,
+            h.position[2] * 2
+        );
         
-        // تحديث الكاميرا
+        // وضع النقطة على سطح الكرة
+        vector.normalize().multiplyScalar(99);
+        
         camera.updateMatrixWorld();
-        
-        // إسقاط النقطة
         vector.project(camera);
 
         const x = (vector.x * 0.5 + 0.5) * window.innerWidth;
         const y = (-vector.y * 0.5 + 0.5) * window.innerHeight;
 
-        // التحقق إذا كانت النقطة أمام الكاميرا
         if (vector.z < 1 && x >= 0 && x <= window.innerWidth && y >= 0 && y <= window.innerHeight) {
             div.style.left = x + 'px';
             div.style.top = y + 'px';
             div.style.display = 'block';
-            div.style.opacity = '1';
         } else {
             div.style.display = 'none';
         }
@@ -246,8 +248,6 @@ function animate() {
     requestAnimationFrame(animate);
     
     if (controls) controls.update();
-    
-    // تحديث مواقع النقاط الساخنة باستمرار
     updateHotspotPositions();
     
     if (renderer && scene3D && camera) {
