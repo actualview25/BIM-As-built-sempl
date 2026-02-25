@@ -5,27 +5,22 @@ let autoRotate = true;
 let pathObjects = [];
 let hotspotElements = [];
 
-// ثابت لتحجيم المسارات
-const SCALE_FACTOR = 30; // جرب 30, 40, 50 حسب الحاجة
-
-function normalizeColor(color) {
-    if (typeof color === 'number') return color;
-    return 0xffffff;
-}
+// ثابت التحجيم
+const SCALE = 30;
 
 function init() {
-    console.log('🚀 بدء التحميل...');
+    console.log('بدء التحميل...');
     fetch('tour-data.json')
         .then(res => res.json())
         .then(data => {
             scenes = data.scenes;
-            console.log('✅ تم تحميل JSON بنجاح');
+            console.log('✅ تم تحميل JSON');
             setupScene();
             loadScene(0);
         })
         .catch(err => {
-            console.error('❌ خطأ في JSON:', err);
-            alert('خطأ في ملف JSON - تأكد من تنسيقه');
+            console.error('خطأ:', err);
+            alert('خطأ في ملف JSON');
         });
 }
 
@@ -66,7 +61,6 @@ function loadScene(index) {
     const data = scenes[index];
     if (!data) return;
     
-    console.log('تحميل المشهد:', data.name);
     currentScene = index;
 
     // تنظيف
@@ -78,7 +72,7 @@ function loadScene(index) {
 
     // تحميل الصورة
     new THREE.TextureLoader().load(data.image, texture => {
-        // إنشاء الكرة
+        // الكرة
         const geometry = new THREE.SphereGeometry(500, 64, 64);
         const material = new THREE.MeshBasicMaterial({ 
             map: texture, 
@@ -87,93 +81,77 @@ function loadScene(index) {
         sphereMesh = new THREE.Mesh(geometry, material);
         scene3D.add(sphereMesh);
 
-        // رسم المسارات
-        if (data.paths && data.paths.length > 0) {
-            drawPaths(data.paths);
+        // المسارات
+        if (data.paths) {
+            data.paths.forEach(path => {
+                const points = path.points.map(p => new THREE.Vector3(
+                    p[0] * SCALE,
+                    p[1] * SCALE,
+                    p[2] * SCALE
+                ));
+                
+                for (let i = 0; i < points.length - 1; i++) {
+                    const start = points[i];
+                    const end = points[i + 1];
+                    const dir = new THREE.Vector3().subVectors(end, start);
+                    const dist = dir.length();
+                    
+                    const cylinder = new THREE.Mesh(
+                        new THREE.CylinderGeometry(2, 2, dist, 6),
+                        new THREE.MeshStandardMaterial({ color: path.color })
+                    );
+                    
+                    cylinder.quaternion.setFromUnitVectors(
+                        new THREE.Vector3(0, 1, 0),
+                        dir.clone().normalize()
+                    );
+                    
+                    cylinder.position.copy(
+                        new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5)
+                    );
+                    
+                    scene3D.add(cylinder);
+                    pathObjects.push(cylinder);
+                }
+            });
         }
-        
-        // رسم النقاط الساخنة
-        if (data.hotspots && data.hotspots.length > 0) {
-            drawHotspots(data.hotspots);
+
+        // النقاط الساخنة
+        if (data.hotspots) {
+            data.hotspots.forEach(h => {
+                const div = document.createElement('div');
+                div.className = 'hotspot';
+                div.innerHTML = '🚪';
+                div.style.fontSize = '30px';
+                div.style.position = 'absolute';
+                div.style.cursor = 'pointer';
+                div.style.zIndex = '100';
+                div.style.transform = 'translate(-50%, -50%)';
+                document.body.appendChild(div);
+                
+                hotspotElements.push({
+                    element: div,
+                    pos: h.position
+                });
+
+                div.onclick = () => {
+                    const target = scenes.findIndex(s => s.id === h.targetId);
+                    if (target !== -1) loadScene(target);
+                };
+            });
         }
-    }, undefined, (err) => {
-        console.error('فشل تحميل الصورة:', data.image);
     });
 }
 
-function drawPaths(paths) {
-    paths.forEach(path => {
-        const color = normalizeColor(path.color);
-        
-        // تحويل النقاط مع التحجيم
-        const points = path.points.map(p => new THREE.Vector3(
-            p[0] * SCALE_FACTOR,
-            p[1] * SCALE_FACTOR,
-            p[2] * SCALE_FACTOR
-        ));
-
-        for (let i = 0; i < points.length - 1; i++) {
-            const start = points[i];
-            const end = points[i + 1];
-            
-            const dir = new THREE.Vector3().subVectors(end, start);
-            const dist = dir.length();
-            
-            if (dist < 1) continue;
-
-            // خط المسار
-            const cylinder = new THREE.Mesh(
-                new THREE.CylinderGeometry(2, 2, dist, 6),
-                new THREE.MeshStandardMaterial({ 
-                    color: color,
-                    emissive: color,
-                    emissiveIntensity: 0.3
-                })
-            );
-
-            cylinder.quaternion.setFromUnitVectors(
-                new THREE.Vector3(0, 1, 0),
-                dir.clone().normalize()
-            );
-            
-            cylinder.position.copy(
-                new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5)
-            );
-
-            scene3D.add(cylinder);
-            pathObjects.push(cylinder);
-        }
-    });
-}
-
-function drawHotspots(hotspots) {
-    hotspots.forEach(h => {
-        const div = document.createElement('div');
-        div.className = 'hotspot';
-        div.innerHTML = '<span class="hotspot-icon">🚪</span>';
-        div.title = `انتقال إلى ${h.targetId}`;
-        document.body.appendChild(div);
-        
-        hotspotElements.push({
-            element: div,
-            position: h.position
-        });
-
-        div.onclick = () => {
-            const target = scenes.findIndex(s => s.id === h.targetId);
-            if (target !== -1) loadScene(target);
-        };
-    });
+function animate() {
+    requestAnimationFrame(animate);
     
-    updateHotspots();
-}
-
-function updateHotspots() {
+    // تحديث مواقع النقاط
     hotspotElements.forEach(item => {
         const vec = new THREE.Vector3(
-            item.position[0] * SCALE_FACTOR,
-            item.position[1] * SCALE_FACTOR,
-            item.position[2] * SCALE_FACTOR
+            item.pos[0] * SCALE,
+            item.pos[1] * SCALE,
+            item.pos[2] * SCALE
         );
         
         vec.project(camera);
@@ -181,7 +159,7 @@ function updateHotspots() {
         const x = (vec.x * 0.5 + 0.5) * window.innerWidth;
         const y = (-vec.y * 0.5 + 0.5) * window.innerHeight;
         
-        if (vec.z < 1 && x > 0 && x < window.innerWidth && y > 0 && y < window.innerHeight) {
+        if (vec.z < 1) {
             item.element.style.left = x + 'px';
             item.element.style.top = y + 'px';
             item.element.style.display = 'block';
@@ -189,12 +167,8 @@ function updateHotspots() {
             item.element.style.display = 'none';
         }
     });
-}
-
-function animate() {
-    requestAnimationFrame(animate);
+    
     controls.update();
-    updateHotspots();
     renderer.render(scene3D, camera);
 }
 
