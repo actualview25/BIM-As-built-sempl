@@ -2,7 +2,7 @@ let scenes = [];
 let currentScene = 0;
 let scene3D, camera, renderer, controls, sphereMesh;
 let autoRotate = true;
-let hotspots = []; // لتخزين النقاط الساخنة الحالية
+let ambientLight, directionalLight; // تخزين الإضاءة كمتغيرات عامة
 
 function normalizeColor(color) {
     if (typeof color === 'number') return color;
@@ -25,6 +25,7 @@ function init() {
         })
         .catch(err => {
             console.error('❌ فشل تحميل JSON:', err);
+            document.body.innerHTML += '<div style="color:red;padding:20px;">خطأ في تحميل ملف JSON</div>';
         });
 }
 
@@ -33,10 +34,10 @@ function setupScene() {
     scene3D.background = new THREE.Color(0x000000);
 
     // إضافة إضاءة خفيفة للمسارات
-    const ambientLight = new THREE.AmbientLight(0x404040);
+    ambientLight = new THREE.AmbientLight(0x404040);
     scene3D.add(ambientLight);
     
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+    directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
     directionalLight.position.set(1, 1, 1);
     scene3D.add(directionalLight);
 
@@ -70,39 +71,29 @@ function onWindowResize() {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
-    
-    // إعادة رسم النقاط الساخنة بعد تغيير الحجم
-    if (scenes[currentScene] && scenes[currentScene].hotspots) {
-        updateHotspotPositions(scenes[currentScene].hotspots);
-    }
 }
 
-// دالة ذكية لتحميل الصورة
-function loadImageWithFallback(imagePath, successCallback, errorCallback) {
+// دالة مبسطة لتحميل الصورة
+function loadSceneImage(imagePath, successCallback, errorCallback) {
     const loader = new THREE.TextureLoader();
-    
-    // استخراج رقم المشهد من المسار
     const sceneNumber = imagePath.match(/\d+/)?.[0] || '0';
     
-    // قائمة المسارات للمحاولة
+    // نجرب المسارين المحتملين فقط
     const pathsToTry = [
-        imagePath,  // المسار الأصلي: panos/scene0.jpg
-        `panos/scene-${sceneNumber}.jpg`,  // panos/scene-0.jpg
-        `panos/${sceneNumber}.jpg`,  // panos/0.jpg
-        `scene${sceneNumber}.jpg`,  // scene0.jpg
-        `./panos/scene${sceneNumber}.jpg`,  // مع ./
+        imagePath,                    // panos/scene0.jpg
+        `panos/scene-${sceneNumber}.jpg` // panos/scene-0.jpg
     ];
     
     let attempt = 0;
     
-    function tryNextPath() {
+    function tryNext() {
         if (attempt >= pathsToTry.length) {
-            console.error('❌ كل المسارات فشلت للصورة:', imagePath);
+            console.error('❌ فشل تحميل الصورة من كل المسارات');
             if (errorCallback) errorCallback();
             return;
         }
         
-        console.log(`محاولة ${attempt + 1}/${pathsToTry.length}: ${pathsToTry[attempt]}`);
+        console.log(`محاولة تحميل: ${pathsToTry[attempt]}`);
         
         loader.load(
             pathsToTry[attempt],
@@ -114,12 +105,12 @@ function loadImageWithFallback(imagePath, successCallback, errorCallback) {
             (error) => {
                 console.log(`❌ فشل: ${pathsToTry[attempt]}`);
                 attempt++;
-                tryNextPath();
+                tryNext();
             }
         );
     }
     
-    tryNextPath();
+    tryNext();
 }
 
 function loadScene(index) {
@@ -127,19 +118,28 @@ function loadScene(index) {
     if (!data) return;
     
     currentScene = index;
-    console.log('🔄 تحميل المشهد:', data.name, data);
+    console.log('🔄 تحميل المشهد:', data.name);
 
-    // إزالة المشهد السابق
-    if (sphereMesh) scene3D.remove(sphereMesh);
+    // إزالة الكرة القديمة فقط، مع الاحتفاظ بالإضاءة
+    if (sphereMesh) {
+        scene3D.remove(sphereMesh);
+        sphereMesh = null;
+    }
     
-    // إزالة المسارات السابقة (إذا كنا نخزنها بشكل منفصل)
-    // يمكن تحسين هذا بحفظ المسارات في مصفوفة
-    scene3D.children = scene3D.children.filter(child => child === camera || child === ambientLight || child === directionalLight);
+    // إزالة جميع المسارات القديمة (أي شيء ليس إضاءة أو كاميرا)
+    const itemsToRemove = [];
+    scene3D.children.forEach(child => {
+        if (child !== ambientLight && child !== directionalLight && child !== camera) {
+            itemsToRemove.push(child);
+        }
+    });
+    itemsToRemove.forEach(child => scene3D.remove(child));
     
+    // إزالة النقاط الساخنة القديمة
     document.querySelectorAll('.hotspot').forEach(e => e.remove());
 
-    // تحميل الصورة
-    loadImageWithFallback(
+    // تحميل الصورة الجديدة
+    loadSceneImage(
         data.image,
         (texture) => {
             // تكوين الصورة
@@ -159,23 +159,19 @@ function loadScene(index) {
             if (data.paths && data.paths.length > 0) {
                 console.log('رسم المسارات:', data.paths.length);
                 drawPaths(data.paths);
-            } else {
-                console.log('لا توجد مسارات في هذا المشهد');
             }
             
             // رسم النقاط الساخنة
             if (data.hotspots && data.hotspots.length > 0) {
                 console.log('رسم النقاط الساخنة:', data.hotspots.length);
-                // تأخير بسيط للتأكد من تحميل الصورة بالكامل
+                // تأخير بسيط للتأكد من اكتمال التحميل
                 setTimeout(() => {
                     drawHotspots(data.hotspots);
                 }, 300);
-            } else {
-                console.log('لا توجد نقاط ساخنة في هذا المشهد');
             }
         },
         () => {
-            alert(`خطأ في تحميل الصورة للمشهد: ${data.name}`);
+            alert(`خطأ في تحميل الصورة: ${data.image}\nتأكد من وجود الملف في مجلد panos/`);
         }
     );
 }
@@ -183,15 +179,12 @@ function loadScene(index) {
 function drawPaths(paths) {
     paths.forEach(path => {
         const color = normalizeColor(path.color);
-        console.log('رسم مسار بلون:', color.toString(16), path.type);
-        
         const points = path.points.map(p => new THREE.Vector3(p[0], p[1], p[2]));
         
         for (let i = 0; i < points.length - 1; i++) {
             const start = points[i];
             const end = points[i + 1];
             
-            // حساب الاتجاه والمسافة
             const direction = new THREE.Vector3().subVectors(end, start);
             const distance = direction.length();
             
@@ -218,25 +211,6 @@ function drawPaths(paths) {
             cylinder.position.copy(center);
             
             scene3D.add(cylinder);
-            
-            // إضافة كرة صغيرة في نقاط التحول (اختياري)
-            if (i === 0) {
-                const sphere = new THREE.Mesh(
-                    new THREE.SphereGeometry(2, 8, 8),
-                    new THREE.MeshStandardMaterial({ color: color, emissive: color, emissiveIntensity: 0.3 })
-                );
-                sphere.position.copy(start);
-                scene3D.add(sphere);
-            }
-            
-            if (i === points.length - 2) {
-                const sphere = new THREE.Mesh(
-                    new THREE.SphereGeometry(2, 8, 8),
-                    new THREE.MeshStandardMaterial({ color: color, emissive: color, emissiveIntensity: 0.3 })
-                );
-                sphere.position.copy(end);
-                scene3D.add(sphere);
-            }
         }
     });
 }
@@ -244,8 +218,6 @@ function drawPaths(paths) {
 function drawHotspots(hotspotsData) {
     // إزالة النقاط الساخنة القديمة
     document.querySelectorAll('.hotspot').forEach(e => e.remove());
-    
-    console.log('رسم نقاط ساخنة:', hotspotsData.length);
     
     hotspotsData.forEach((h, index) => {
         // تحويل النقطة من إحداثيات المسرح إلى إحداثيات الشاشة
@@ -261,17 +233,8 @@ function drawHotspots(hotspotsData) {
         const x = (vector.x * 0.5 + 0.5) * window.innerWidth;
         const y = (-vector.y * 0.5 + 0.5) * window.innerHeight;
         
-        console.log(`نقطة ${index} في:`, h.position, 'على الشاشة:', x, y, 'z:', vector.z);
-        
-        // تجاهل النقاط خلف الكاميرا
-        if (vector.z > 1) {
-            console.log('نقطة خلف الكاميرا:', h.position);
-            return;
-        }
-        
-        // تجاهل النقاط خارج الشاشة
-        if (x < 0 || x > window.innerWidth || y < 0 || y > window.innerHeight) {
-            console.log('نقطة خارج الشاشة:', h.position);
+        // تجاهل النقاط خلف الكاميرا أو خارج الشاشة
+        if (vector.z > 1 || x < 0 || x > window.innerWidth || y < 0 || y > window.innerHeight) {
             return;
         }
 
@@ -295,18 +258,11 @@ function drawHotspots(hotspotsData) {
             e.stopPropagation();
             e.preventDefault();
             
-            if (!h.targetId) {
-                console.warn('لا يوجد targetId لهذه النقطة');
-                return;
-            }
+            if (!h.targetId) return;
             
             const targetIndex = scenes.findIndex(s => s.id === h.targetId);
-            console.log('النقر على نقطة، البحث عن:', h.targetId, 'النتيجة:', targetIndex);
-            
             if (targetIndex !== -1) {
                 loadScene(targetIndex);
-            } else {
-                alert(`لم يتم العثور على المشهد: ${h.targetId}`);
             }
         };
         
@@ -314,39 +270,10 @@ function drawHotspots(hotspotsData) {
     });
 }
 
-function updateHotspotPositions(hotspotsData) {
-    // تحديث مواقع النقاط الساخنة (للاستخدام مع التكبير/التصغير)
-    document.querySelectorAll('.hotspot').forEach((div, index) => {
-        if (index < hotspotsData.length) {
-            const h = hotspotsData[index];
-            const vector = new THREE.Vector3(h.position[0], h.position[1], h.position[2]);
-            
-            camera.updateMatrixWorld();
-            vector.project(camera);
-            
-            const x = (vector.x * 0.5 + 0.5) * window.innerWidth;
-            const y = (-vector.y * 0.5 + 0.5) * window.innerHeight;
-            
-            if (vector.z <= 1 && x >= 0 && x <= window.innerWidth && y >= 0 && y <= window.innerHeight) {
-                div.style.left = x + 'px';
-                div.style.top = y + 'px';
-                div.style.display = 'block';
-            } else {
-                div.style.display = 'none';
-            }
-        }
-    });
-}
-
 function animate() {
     requestAnimationFrame(animate);
     
     if (controls) controls.update();
-    
-    // تحديث مواقع النقاط الساخنة أثناء الدوران
-    if (scenes[currentScene] && scenes[currentScene].hotspots) {
-        updateHotspotPositions(scenes[currentScene].hotspots);
-    }
     
     if (renderer && scene3D && camera) {
         renderer.render(scene3D, camera);
