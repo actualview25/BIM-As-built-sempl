@@ -1,24 +1,16 @@
 [
   {
-    "name": "Entrance",
-    "image": "panos/scene0.jpg",
-    "hotspots": [
-      { "x": 3000, "y": 0, "z": 0, "target": 1 }
+    "name":"Entrance",
+    "image":"panos/scene0.jpg",
+    "hotspots":[
+      { "x":3000,"y":0,"z":0,"target":1 }
     ]
   },
   {
-    "name": "Main Floor",
-    "image": "panos/scene1.jpg",
-    "hotspots": [
-      { "x": -3000, "y": 0, "z": 0, "target": 0 },
-      { "x": 0, "y": 0, "z": 3000, "target": 2 }
+    "name":"Main Floor",
+    "image":"panos/scene1.jpg",
+    "hotspots":[
+      { "x":-3000,"y":0,"z":0,"target":0 }
     ]
-  },
-  {
-    "name": "Electrical BIM",
-    "image": "panos/scene2.jpg",
-    "hotspots": []
-  },
-  { "name": "Scene 3", "image": "panos/scene3.jpg" },
-  { "name": "Scene 4", "image": "panos/scene4.jpg" }
+  }
 ]
