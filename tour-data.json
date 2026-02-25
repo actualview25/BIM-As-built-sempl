@@ -5,17 +5,23 @@
       "name": "Main Floor",
       "image": "panos/scene1.jpg",
       "paths": [
-        { "type": "EL", "points": [[0,0,0],[50,0,0],[80,0,40]] },
-        { "type": "WP", "points": [[0,0,0],[0,0,60],[40,0,90]] },
-        { "type": "AC", "points": [[-40,0,0],[-40,0,60],[-10,0,100]] }
+        { "type":"EL", "color":"#ffcc00", "points":[[0,0,0],[3,0,0],[6,0,2]] },
+        { "type":"WP", "color":"#0066cc", "points":[[0,0,0],[0,0,4],[2,0,6]] },
+        { "type":"AC", "color":"#00ccff", "points":[[-2,0,0],[-2,0,3],[-1,0,6]] }
+      ],
+      "hotspots":[
+        {"type":"INFO","position":[3,0,0],"title":"معلومات EL","content":"مسار الكهرباء الرئيسي"}
       ]
     },
     {
       "id": "scene_02",
       "name": "Same Floor – BIM",
-      "image": "panos/scene1.jpg",
-      "paths": [
-        { "type": "EL", "points": [[0,0,0],[60,0,20],[100,0,50]] }
+      "image": "panos/scene2.jpg",
+      "paths":[
+        { "type":"EL", "color":"#ffcc00", "points":[[0,0,0],[3,0,1],[6,0,3]] }
+      ],
+      "hotspots":[
+        {"type":"INFO","position":[3,0,1],"title":"معلومات EL BIM","content":"نسخة BIM من الكهرباء"}
       ]
     }
   ]
