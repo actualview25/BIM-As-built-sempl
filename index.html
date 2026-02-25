@@ -18,17 +18,12 @@
         let scenes = [];
         let scene3D, camera, renderer, controls, sphereMesh;
         
-        // دالة مساعدة لتحويل اللون الرقمي إلى هيئة يستخدمها Three.js
         function normalizeColor(color) {
-            if (typeof color === 'number') {
-                return color; // الرقم صالح مباشرة في Three.js
-            } else if (typeof color === 'string') {
-                // إذا كان النص يبدأ بـ # حوله إلى رقم
-                if (color.startsWith('#')) {
-                    return parseInt(color.substring(1), 16);
-                }
+            if (typeof color === 'number') return color;
+            if (typeof color === 'string' && color.startsWith('#')) {
+                return parseInt(color.substring(1), 16);
             }
-            return 0xffffff; // لون افتراضي أبيض
+            return 0xffffff;
         }
 
         // تحميل البيانات
@@ -36,21 +31,19 @@
             .then(res => res.json())
             .then(data => {
                 scenes = data.scenes;
+                console.log('تم تحميل JSON:', scenes);
 
-                // تهيئة المشهد ثلاثي الأبعاد
+                // تهيئة المشهد
                 scene3D = new THREE.Scene();
                 scene3D.background = new THREE.Color(0x000000);
 
-                // الكاميرا
                 camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
                 camera.position.set(0, 0, 0.1);
 
-                // المُصدر (Renderer)
                 renderer = new THREE.WebGLRenderer({ antialias: true });
                 renderer.setSize(window.innerWidth, window.innerHeight);
                 document.getElementById('container').appendChild(renderer.domElement);
 
-                // التحكم بالعرض (OrbitControls)
                 controls = new THREE.OrbitControls(camera, renderer.domElement);
                 controls.enableZoom = true;
                 controls.enablePan = false;
@@ -58,31 +51,30 @@
                 controls.autoRotate = autoRotate;
                 controls.autoRotateSpeed = 0.5;
 
-                // زر تشغيل/إيقاف الدوران
                 document.getElementById('autoRotateBtn').onclick = () => {
                     autoRotate = !autoRotate;
                     controls.autoRotate = autoRotate;
                     document.getElementById('autoRotateBtn').textContent = autoRotate ? '⏸️ إيقاف الدوران' : '▶️ تشغيل الدوران';
                 };
 
-                // دالة تحميل المشهد
                 function loadScene(index) {
                     const sceneData = scenes[index];
                     if (!sceneData) return;
 
                     currentSceneIndex = index;
-                    console.log('جاري تحميل المشهد:', sceneData.name, 'الصورة:', sceneData.image);
+                    console.log('تحميل المشهد:', sceneData.name, 'الصورة:', sceneData.image);
 
-                    // إزالة الكرة السابقة إن وجدت
+                    // إزالة المشهد السابق
                     if (sphereMesh) scene3D.remove(sphereMesh);
-                    
-                    // إزالة جميع النقاط الساخنة القديمة
                     document.querySelectorAll('.hotspot').forEach(el => el.remove());
 
-                    // تحميل الصورة وإنشاء الكرة
-                    new THREE.TextureLoader().load(sceneData.image, 
+                    // تحميل الصورة
+                    new THREE.TextureLoader().load(
+                        sceneData.image,  // بالضبط كما في JSON: panos/scene0.jpg, panos/scene1.jpg, إلخ
                         // دالة النجاح
-                        texture => {
+                        (texture) => {
+                            console.log('✅ تم تحميل الصورة:', sceneData.image);
+                            
                             texture.wrapS = THREE.RepeatWrapping;
                             texture.wrapT = THREE.RepeatWrapping;
                             texture.repeat.x = -1;
@@ -95,7 +87,7 @@
                             sphereMesh = new THREE.Mesh(geometry, material);
                             scene3D.add(sphereMesh);
 
-                            // إضافة المسارات (Paths)
+                            // إضافة المسارات
                             if (sceneData.paths && sceneData.paths.length > 0) {
                                 sceneData.paths.forEach(path => {
                                     const points = path.points.map(p => new THREE.Vector3(p[0], p[1], p[2]));
@@ -107,9 +99,8 @@
                                         const dir = new THREE.Vector3().subVectors(end, start);
                                         const dist = dir.length();
                                         
-                                        if (dist < 0.5) continue; // تجاهل المسافات القصيرة جداً
+                                        if (dist < 0.5) continue;
                                         
-                                        // إنشاء أسطوانة للخط
                                         const cylinder = new THREE.Mesh(
                                             new THREE.CylinderGeometry(2, 2, dist, 8),
                                             new THREE.MeshStandardMaterial({ 
@@ -119,14 +110,12 @@
                                             })
                                         );
                                         
-                                        // توجيه الأسطوانة
                                         const quaternion = new THREE.Quaternion().setFromUnitVectors(
                                             new THREE.Vector3(0, 1, 0),
                                             dir.clone().normalize()
                                         );
                                         cylinder.applyQuaternion(quaternion);
                                         
-                                        // تحديد الموضع في المنتصف
                                         const center = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
                                         cylinder.position.copy(center);
                                         
@@ -135,38 +124,32 @@
                                 });
                             }
 
-                            // انتظار دورة عرض كاملة ثم حساب مواقع النقاط الساخنة
+                            // إضافة النقاط الساخنة
                             setTimeout(() => {
                                 if (!sceneData.hotspots) return;
                                 
                                 sceneData.hotspots.forEach(hotspot => {
-                                    // تحويل النقطة إلى إحداثيات الشاشة
                                     const vector = new THREE.Vector3(
                                         hotspot.position[0],
                                         hotspot.position[1],
                                         hotspot.position[2]
                                     );
                                     
-                                    // التأكد من أن الكاميرا محدثة
                                     camera.updateMatrixWorld();
                                     vector.project(camera);
                                     
-                                    // تحويل إلى إحداثيات شاشة (0 إلى 1)
                                     const x = (vector.x * 0.5 + 0.5) * window.innerWidth;
                                     const y = (-vector.y * 0.5 + 0.5) * window.innerHeight;
                                     
-                                    // تجاهل النقاط خلف الكاميرا أو خارج الشاشة
                                     if (vector.z > 1 || x < 0 || x > window.innerWidth || y < 0 || y > window.innerHeight) {
                                         return;
                                     }
 
-                                    // إنشاء عنصر HTML للنقطة الساخنة
                                     const div = document.createElement('div');
                                     div.className = 'hotspot';
                                     div.style.left = x + 'px';
                                     div.style.top = y + 'px';
                                     
-                                    // تحديد نوع النقطة الساخنة
                                     if (hotspot.type === 'NAV') {
                                         div.style.color = '#44aaff';
                                         div.innerHTML = `
@@ -176,88 +159,59 @@
                                             </div>
                                         `;
                                         
-                                        // حدث النقر للانتقال
                                         div.onclick = (e) => {
                                             e.stopPropagation();
                                             const targetIndex = scenes.findIndex(s => s.id === hotspot.targetId);
                                             if (targetIndex !== -1) {
                                                 loadScene(targetIndex);
-                                            } else {
-                                                console.warn('لم يتم العثور على المشهد:', hotspot.targetId);
                                             }
                                         };
                                     }
                                     
                                     document.body.appendChild(div);
                                 });
-                            }, 500); // تأخير أطول لضمان تحميل الكرة بالكامل
+                            }, 500);
                         },
-                        // دالة التحميل (للملفات الكبيرة)
+                        // دالة التقدم
                         undefined,
                         // دالة الخطأ
                         (error) => {
-                            console.error('فشل تحميل الصورة:', sceneData.image, error);
-                            alert(`فشل تحميل الصورة: ${sceneData.image}\nتأكد من وجود الملف في المسار الصحيح.`);
+                            console.error('❌ فشل تحميل الصورة:', sceneData.image, error);
+                            
+                            // عرض رسالة خطأ للمستخدم
+                            const errorDiv = document.createElement('div');
+                            errorDiv.style.cssText = `
+                                position: fixed;
+                                top: 20px;
+                                right: 20px;
+                                background: rgba(255, 0, 0, 0.9);
+                                color: white;
+                                padding: 15px;
+                                border-radius: 8px;
+                                z-index: 1000;
+                                direction: rtl;
+                            `;
+                            errorDiv.innerHTML = `
+                                <strong>خطأ في تحميل الصورة:</strong><br>
+                                ${sceneData.image}<br>
+                                <small>تأكد من وجود الملف في مجلد panos/</small>
+                            `;
+                            document.body.appendChild(errorDiv);
+                            
+                            // إزالة الرسالة بعد 5 ثوان
+                            setTimeout(() => errorDiv.remove(), 5000);
                         }
                     );
                 }
 
-                // بدأ بالمشهد الأول (رقم 0)
+                // بدأ بالمشهد الأول (scene0)
                 loadScene(0);
 
-                // التعامل مع تغيير حجم النافذة
+                // تحديث حجم الشاشة
                 window.addEventListener('resize', () => {
                     camera.aspect = window.innerWidth / window.innerHeight;
                     camera.updateProjectionMatrix();
                     renderer.setSize(window.innerWidth, window.innerHeight);
-                    
-                    // إعادة حساب مواقع النقاط الساخنة بعد تغيير الحجم
-                    if (scenes[currentSceneIndex]) {
-                        // إعادة تحميل النقاط الساخنة فقط (حل مؤقت)
-                        setTimeout(() => {
-                            if (sphereMesh) {
-                                const oldHotspots = document.querySelectorAll('.hotspot');
-                                oldHotspots.forEach(el => el.remove());
-                                
-                                scenes[currentSceneIndex].hotspots?.forEach(hotspot => {
-                                    const vector = new THREE.Vector3(
-                                        hotspot.position[0],
-                                        hotspot.position[1],
-                                        hotspot.position[2]
-                                    );
-                                    camera.updateMatrixWorld();
-                                    vector.project(camera);
-                                    
-                                    const x = (vector.x * 0.5 + 0.5) * window.innerWidth;
-                                    const y = (-vector.y * 0.5 + 0.5) * window.innerHeight;
-                                    
-                                    if (vector.z > 1 || x < 0 || x > window.innerWidth || y < 0 || y > window.innerHeight) return;
-                                    
-                                    const div = document.createElement('div');
-                                    div.className = 'hotspot';
-                                    div.style.left = x + 'px';
-                                    div.style.top = y + 'px';
-                                    
-                                    if (hotspot.type === 'NAV') {
-                                        div.style.color = '#44aaff';
-                                        div.innerHTML = `
-                                            <span class='hotspot-icon'>🚪</span>
-                                            <div class='hotspot-tooltip'>
-                                                <strong>انتقال إلى: ${hotspot.targetId}</strong>
-                                            </div>
-                                        `;
-                                        div.onclick = (e) => {
-                                            e.stopPropagation();
-                                            const targetIndex = scenes.findIndex(s => s.id === hotspot.targetId);
-                                            if (targetIndex !== -1) loadScene(targetIndex);
-                                        };
-                                    }
-                                    
-                                    document.body.appendChild(div);
-                                });
-                            }
-                        }, 100);
-                    }
                 });
 
                 // حلقة التحريك
@@ -269,8 +223,12 @@
                 animate();
             })
             .catch(error => {
-                console.error('فشل تحميل ملف tour-data.json:', error);
-                document.body.innerHTML += '<div style="color:red;position:fixed;top:10px;right:10px;background:white;padding:10px;">خطأ في تحميل ملف البيانات</div>';
+                console.error('❌ فشل تحميل JSON:', error);
+                document.body.innerHTML += `
+                    <div style="color:red;position:fixed;top:10px;right:10px;background:white;padding:10px;">
+                        خطأ في تحميل ملف tour-data.json
+                    </div>
+                `;
             });
     </script>
 </body>
