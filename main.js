@@ -3,7 +3,7 @@ let currentScene = 0;
 let scene3D, camera, renderer, controls, sphereMesh;
 let autoRotate = true;
 
-// لتخزين المسارات والنقاط الساخنة لإزالة/تحديث كل مشهد
+// لتخزين المسارات والنقاط الساخنة
 let pathObjects = [];
 let hotspotElements = [];
 
@@ -35,12 +35,12 @@ function setupScene() {
     scene3D = new THREE.Scene();
     scene3D.background = new THREE.Color(0x000000);
 
-    // إضاءة عامة
+    // إضاءة عامة للمسارات
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
     scene3D.add(ambientLight);
 
-    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
-    camera.position.set(0, 0, 0.1);
+    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 0, 0.1);  // الكاميرا داخل الكرة
 
     renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
@@ -87,27 +87,65 @@ function loadScene(index) {
 
     // تحميل الصورة
     const loader = new THREE.TextureLoader();
+    
+    // نجرب المسارين المحتملين
+    const imagePath = data.image;
+    const altImagePath = imagePath.replace('scene', 'scene-');
+    
+    console.log('محاولة تحميل الصورة:', imagePath);
+    
     loader.load(
-        data.image,
+        imagePath,
         (texture) => {
-            texture.wrapS = THREE.RepeatWrapping;
-            texture.wrapT = THREE.RepeatWrapping;
-            texture.repeat.x = -1;
-
-            const geometry = new THREE.SphereGeometry(500, 64, 64);
-            const material = new THREE.MeshBasicMaterial({ map: texture, side: THREE.BackSide });
-            sphereMesh = new THREE.Mesh(geometry, material);
-            scene3D.add(sphereMesh);
-
-            if (data.paths && data.paths.length > 0) drawPaths(data.paths);
-            if (data.hotspots && data.hotspots.length > 0) drawHotspots(data.hotspots);
+            console.log('✅ تم تحميل الصورة:', imagePath);
+            createSphereWithTexture(texture, data);
         },
         undefined,
         (err) => {
-            console.error('❌ فشل تحميل الصورة:', data.image, err);
-            alert(`خطأ في تحميل الصورة: ${data.image}`);
+            console.log('❌ فشل المسار الأول، جرب المسار البديل:', altImagePath);
+            loader.load(
+                altImagePath,
+                (texture) => {
+                    console.log('✅ تم تحميل الصورة:', altImagePath);
+                    createSphereWithTexture(texture, data);
+                },
+                undefined,
+                (err) => {
+                    console.error('❌ فشل تحميل الصورة من كل المسارات:', data.image);
+                    alert(`خطأ في تحميل الصورة: ${data.image}\nتأكد من وجود الملف في مجلد panos/`);
+                }
+            );
         }
     );
+}
+
+function createSphereWithTexture(texture, data) {
+    // تعديل إعدادات النسيج
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.ClampToEdgeWrapping;  // تغيير هذا
+    texture.repeat.set(1, 1);  // عدم التكرار
+    
+    // الكرة بحجم 100 (أصغر) والكاميرا في المركز
+    const geometry = new THREE.SphereGeometry(100, 64, 64);
+    const material = new THREE.MeshBasicMaterial({ 
+        map: texture, 
+        side: THREE.BackSide
+    });
+    
+    sphereMesh = new THREE.Mesh(geometry, material);
+    scene3D.add(sphereMesh);
+
+    // رسم المسارات
+    if (data.paths && data.paths.length > 0) {
+        console.log('رسم المسارات:', data.paths.length);
+        drawPaths(data.paths);
+    }
+    
+    // رسم النقاط الساخنة
+    if (data.hotspots && data.hotspots.length > 0) {
+        console.log('رسم النقاط الساخنة:', data.hotspots.length);
+        drawHotspots(data.hotspots);
+    }
 }
 
 function drawPaths(paths) {
@@ -120,49 +158,58 @@ function drawPaths(paths) {
             const end = points[i + 1];
             const dir = new THREE.Vector3().subVectors(end, start);
             const distance = dir.length();
+            
             if (distance < 0.1) continue;
 
+            // إنشاء اسطوانة للخط
             const cylinder = new THREE.Mesh(
                 new THREE.CylinderGeometry(1.5, 1.5, distance, 8),
-                new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.5 })
+                new THREE.MeshStandardMaterial({ 
+                    color: color, 
+                    emissive: color, 
+                    emissiveIntensity: 0.3 
+                })
             );
 
-            cylinder.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize());
-            cylinder.position.copy(new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5));
+            cylinder.quaternion.setFromUnitVectors(
+                new THREE.Vector3(0, 1, 0), 
+                dir.clone().normalize()
+            );
+            
+            cylinder.position.copy(
+                new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5)
+            );
 
             scene3D.add(cylinder);
             pathObjects.push(cylinder);
-
-            // نقاط بداية ونهاية الخطوط
-            [start, end].forEach(pos => {
-                const sphere = new THREE.Mesh(
-                    new THREE.SphereGeometry(2, 8, 8),
-                    new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.3 })
-                );
-                sphere.position.copy(pos);
-                scene3D.add(sphere);
-                pathObjects.push(sphere);
-            });
         }
     });
 }
 
 function drawHotspots(hotspotsData) {
-    hotspotsData.forEach(h => {
+    hotspotsData.forEach((h, index) => {
         const div = document.createElement('div');
         div.className = 'hotspot';
-        div.innerHTML = `<span class='hotspot-icon'>🚪</span>
-                         <div class='hotspot-tooltip'>انتقال إلى: ${h.targetId || 'مشهد آخر'}</div>`;
+        div.innerHTML = `
+            <span class='hotspot-icon'>🚪</span>
+            <div class='hotspot-tooltip'>
+                <strong>انتقال إلى: ${h.targetId || 'مشهد آخر'}</strong>
+            </div>
+        `;
         document.body.appendChild(div);
         hotspotElements.push(div);
 
         div.onclick = () => {
             const targetIndex = scenes.findIndex(s => s.id === h.targetId);
-            if (targetIndex !== -1) loadScene(targetIndex);
+            if (targetIndex !== -1) {
+                console.log('الانتقال إلى:', h.targetId);
+                loadScene(targetIndex);
+            }
         };
     });
 
-    updateHotspotPositions();
+    // تحديث المواقع بعد إضافة النقاط
+    setTimeout(updateHotspotPositions, 100);
 }
 
 function updateHotspotPositions() {
@@ -173,25 +220,39 @@ function updateHotspotPositions() {
         if (!div) return;
 
         const vector = new THREE.Vector3(h.position[0], h.position[1], h.position[2]);
+        
+        // تحديث الكاميرا
         camera.updateMatrixWorld();
+        
+        // إسقاط النقطة
         vector.project(camera);
 
         const x = (vector.x * 0.5 + 0.5) * window.innerWidth;
         const y = (-vector.y * 0.5 + 0.5) * window.innerHeight;
 
-        if (vector.z <= 1 && x >= 0 && x <= window.innerWidth && y >= 0 && y <= window.innerHeight) {
+        // التحقق إذا كانت النقطة أمام الكاميرا
+        if (vector.z < 1 && x >= 0 && x <= window.innerWidth && y >= 0 && y <= window.innerHeight) {
             div.style.left = x + 'px';
             div.style.top = y + 'px';
             div.style.display = 'block';
-        } else div.style.display = 'none';
+            div.style.opacity = '1';
+        } else {
+            div.style.display = 'none';
+        }
     });
 }
 
 function animate() {
     requestAnimationFrame(animate);
+    
     if (controls) controls.update();
+    
+    // تحديث مواقع النقاط الساخنة باستمرار
     updateHotspotPositions();
-    if (renderer && scene3D && camera) renderer.render(scene3D, camera);
+    
+    if (renderer && scene3D && camera) {
+        renderer.render(scene3D, camera);
+    }
 }
 
 // بدء التطبيق
