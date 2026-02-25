@@ -9,7 +9,7 @@ let hotspotElements = [];
 const SCALE = 30;
 
 function init() {
-    console.log('بدء التحميل...');
+    console.log('🚀 بدء التحميل...');
     fetch('tour-data.json')
         .then(res => res.json())
         .then(data => {
@@ -19,7 +19,7 @@ function init() {
             loadScene(0);
         })
         .catch(err => {
-            console.error('خطأ:', err);
+            console.error('❌ خطأ:', err);
             alert('خطأ في ملف JSON');
         });
 }
@@ -63,12 +63,31 @@ function loadScene(index) {
     
     currentScene = index;
 
-    // تنظيف
-    if (sphereMesh) scene3D.remove(sphereMesh);
-    pathObjects.forEach(p => scene3D.remove(p));
-    pathObjects = [];
-    hotspotElements.forEach(e => e.remove());
-    hotspotElements = [];
+    // تنظيف المشهد السابق بطريقة آمنة
+    if (sphereMesh) {
+        scene3D.remove(sphereMesh);
+        sphereMesh = null;
+    }
+    
+    // إزالة المسارات القديمة
+    if (pathObjects.length > 0) {
+        pathObjects.forEach(p => {
+            if (p) scene3D.remove(p);
+        });
+        pathObjects = [];
+    }
+    
+    // إزالة النقاط الساخنة القديمة بطريقة آمنة
+    if (hotspotElements.length > 0) {
+        hotspotElements.forEach(item => {
+            if (item && item.element && item.element.remove) {
+                item.element.remove();
+            } else if (item && item.element) {
+                document.body.removeChild(item.element);
+            }
+        });
+        hotspotElements = [];
+    }
 
     // تحميل الصورة
     new THREE.TextureLoader().load(data.image, texture => {
@@ -82,7 +101,7 @@ function loadScene(index) {
         scene3D.add(sphereMesh);
 
         // المسارات
-        if (data.paths) {
+        if (data.paths && data.paths.length > 0) {
             data.paths.forEach(path => {
                 const points = path.points.map(p => new THREE.Vector3(
                     p[0] * SCALE,
@@ -96,9 +115,15 @@ function loadScene(index) {
                     const dir = new THREE.Vector3().subVectors(end, start);
                     const dist = dir.length();
                     
+                    if (dist < 0.1) continue;
+                    
                     const cylinder = new THREE.Mesh(
                         new THREE.CylinderGeometry(2, 2, dist, 6),
-                        new THREE.MeshStandardMaterial({ color: path.color })
+                        new THREE.MeshStandardMaterial({ 
+                            color: path.color,
+                            emissive: path.color,
+                            emissiveIntensity: 0.3
+                        })
                     );
                     
                     cylinder.quaternion.setFromUnitVectors(
@@ -117,16 +142,17 @@ function loadScene(index) {
         }
 
         // النقاط الساخنة
-        if (data.hotspots) {
+        if (data.hotspots && data.hotspots.length > 0) {
             data.hotspots.forEach(h => {
                 const div = document.createElement('div');
                 div.className = 'hotspot';
-                div.innerHTML = '🚪';
-                div.style.fontSize = '30px';
+                div.innerHTML = '<span style="font-size:30px;">🚪</span>';
                 div.style.position = 'absolute';
                 div.style.cursor = 'pointer';
-                div.style.zIndex = '100';
+                div.style.zIndex = '1000';
                 div.style.transform = 'translate(-50%, -50%)';
+                div.style.color = '#44aaff';
+                div.style.filter = 'drop-shadow(0 0 10px currentColor)';
                 document.body.appendChild(div);
                 
                 hotspotElements.push({
@@ -140,33 +166,39 @@ function loadScene(index) {
                 };
             });
         }
+    }, undefined, (err) => {
+        console.error('فشل تحميل الصورة:', data.image);
     });
 }
 
 function animate() {
     requestAnimationFrame(animate);
     
-    // تحديث مواقع النقاط
-    hotspotElements.forEach(item => {
-        const vec = new THREE.Vector3(
-            item.pos[0] * SCALE,
-            item.pos[1] * SCALE,
-            item.pos[2] * SCALE
-        );
-        
-        vec.project(camera);
-        
-        const x = (vec.x * 0.5 + 0.5) * window.innerWidth;
-        const y = (-vec.y * 0.5 + 0.5) * window.innerHeight;
-        
-        if (vec.z < 1) {
-            item.element.style.left = x + 'px';
-            item.element.style.top = y + 'px';
-            item.element.style.display = 'block';
-        } else {
-            item.element.style.display = 'none';
-        }
-    });
+    // تحديث مواقع النقاط الساخنة
+    if (hotspotElements.length > 0) {
+        hotspotElements.forEach(item => {
+            if (!item.element) return;
+            
+            const vec = new THREE.Vector3(
+                item.pos[0] * SCALE,
+                item.pos[1] * SCALE,
+                item.pos[2] * SCALE
+            );
+            
+            vec.project(camera);
+            
+            const x = (vec.x * 0.5 + 0.5) * window.innerWidth;
+            const y = (-vec.y * 0.5 + 0.5) * window.innerHeight;
+            
+            if (vec.z < 1 && x > 0 && x < window.innerWidth && y > 0 && y < window.innerHeight) {
+                item.element.style.left = x + 'px';
+                item.element.style.top = y + 'px';
+                item.element.style.display = 'block';
+            } else {
+                item.element.style.display = 'none';
+            }
+        });
+    }
     
     controls.update();
     renderer.render(scene3D, camera);
